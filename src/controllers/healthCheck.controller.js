@@ -3,7 +3,7 @@ import { asyncHandler } from '../utils/asyncHandler.js'
 import os from 'os'
 import mongoose from 'mongoose'
 
-const healthCheck = asyncHandler(async (req, res) => {
+const healthCheck = asyncHandler(async (_, res) => {
   const healthInfo = {
     uptime: process.uptime(),
     memoryUsage: process.memoryUsage(),

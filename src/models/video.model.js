@@ -5,11 +5,11 @@ const videoSchema = new Schema(
   {
     videoFile: {
       type: String,
-      required: [true, 'Video url must be provided.'],
+      required: true,
     },
     thumbnail: {
       type: String,
-      required: [true, 'Thumbnail url must be provided.'],
+      required: true,
     },
     owner: {
       type: Schema.Types.ObjectId,
@@ -21,8 +21,8 @@ const videoSchema = new Schema(
       required: true,
     },
     description: {
+      required: true,
       type: String,
-      maxlength: 1000,
     },
     duration: {
       type: Number,
