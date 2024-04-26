@@ -1,17 +1,67 @@
 import mongoose, { isValidObjectId } from 'mongoose'
 import { Video } from '../models/video.model.js'
-import { User } from '../models/user.model.js'
 import {
   asyncHandler,
   ApiError,
   ApiResponse,
   uploadOnCloudinary,
+  deleteFromCloudinary,
+  getCurrentUser,
+  paginateArray,
 } from '../utils/index.js'
-import { deleteFromCloudinary } from '../utils/cloudinary.js'
 
 const getAllVideos = asyncHandler(async (req, res) => {
-  const { page = 1, limit = 10, query, sortBy, sortType, userId } = req.query
-  //TODO: get all videos based on query, sort, pagination
+  const {
+    page = 1,
+    limit = 10,
+    query,
+    sortBy = 'createdAt',
+    sortType = 'desc',
+    userId,
+  } = req.query
+
+  const currentUser = await getCurrentUser(req)
+
+  const videos = await Video.aggregate([
+    {
+      $match: {
+        isPublished: true,
+        ...(userId && {
+          owner: new mongoose.Types.ObjectId(userId),
+          isPublished:
+            currentUser?._id.toHexString() === userId
+              ? { $exists: true }
+              : true,
+        }),
+        ...(query && {
+          $or: [
+            {
+              title: {
+                $regex: query,
+                $options: 'i',
+              },
+            },
+            {
+              description: {
+                $regex: query,
+                $options: 'i',
+              },
+            },
+          ],
+        }),
+      },
+    },
+    {
+      $sort: {
+        [sortBy]: sortType === 'desc' ? -1 : 1,
+      },
+    },
+  ])
+  const paginatedVideos = paginateArray(videos, +page, +limit, 'videos')
+
+  res
+    .status(200)
+    .json(new ApiResponse(200, paginatedVideos, 'Videos fetched successfully.'))
 })
 
 const publishAVideo = asyncHandler(async (req, res) => {
@@ -32,6 +82,17 @@ const publishAVideo = asyncHandler(async (req, res) => {
 
   if (!videoLocalPath || !thumbnailLocalPath) {
     throw new ApiError(400, 'Video and thumbnail must be provided.')
+  }
+
+  if (req.files.videoFile[0].mimetype !== 'video/mp4') {
+    throw new ApiError(400, 'Video must be of type mp4.')
+  }
+
+  if (
+    req.files.thumbnail[0].mimetype !== 'image/jpeg' &&
+    req.files.thumbnail[0].mimetype !== 'image/png'
+  ) {
+    throw new ApiError(400, 'Thumbnail must be an image of type jpeg or png.')
   }
 
   const [videoFile, thumbnail] = await Promise.all([
@@ -68,7 +129,7 @@ const publishAVideo = asyncHandler(async (req, res) => {
 
   res
     .status(201)
-    .json(new ApiResponse(201, UploadedVideo, 'Video uploaded successfully.'))
+    .json(new ApiResponse(201, uploadedVideo, 'Video uploaded successfully.'))
 })
 
 const getVideoById = asyncHandler(async (req, res) => {
@@ -77,13 +138,27 @@ const getVideoById = asyncHandler(async (req, res) => {
     throw new ApiError(400, 'Invalid video id.')
   }
 
-  const video = await Video.findByIdAndUpdate(
-    videoId,
-    {
-      $inc: { views: 1 },
-    },
-    { new: true }
-  )
+  const currentUser = await getCurrentUser(req)
+  console.log('currentUser: ', currentUser)
+
+  let video
+
+  if (!currentUser) {
+    video = await Video.findOneAndUpdate(
+      { _id: videoId, isPublished: true },
+      { $inc: { views: 1 } },
+      { new: true }
+    )
+  } else {
+    video = await Video.findById(videoId)
+    if (
+      video.owner.toString() !== currentUser._id.toString() &&
+      video.isPublished
+    ) {
+      video.views += 1
+      await video.save({ validateBeforeSave: false })
+    }
+  }
   if (!video) {
     throw new ApiError(404, 'Video not found.')
   }
@@ -98,6 +173,14 @@ const updateVideo = asyncHandler(async (req, res) => {
     throw new ApiError(400, 'Invalid video id.')
   }
   const { title, description } = req.body
+  if (req.file) {
+    if (
+      req.file.mimetype !== 'image/jpeg' &&
+      req.file.mimetype !== 'image/png'
+    ) {
+      throw new ApiError(400, 'Thumbnail must be an image of type jpeg or png.')
+    }
+  }
   if (!req.file && !title?.trim() && !description?.trim()) {
     throw new ApiError(400, 'At least one field must be provided.')
   }
@@ -171,15 +254,10 @@ const togglePublishStatus = asyncHandler(async (req, res) => {
     throw new ApiError(400, 'Invalid video id.')
   }
 
-  const video = await Video.findByIdAndUpdate(
-    videoId,
-    {
-      $set: {
-        isPublished: { $not: '$isPublished' },
-      },
-    },
-    { new: true }
-  )
+  const video = await Video.findById(videoId)
+  video.isPublished = !video.isPublished
+  await video.save({ validateBeforeSave: false })
+
   if (!video) {
     throw new ApiError(404, 'Video not found.')
   }
