@@ -184,7 +184,10 @@ const updateVideo = asyncHandler(async (req, res) => {
   if (!req.file && !title?.trim() && !description?.trim()) {
     throw new ApiError(400, 'At least one field must be provided.')
   }
-  const video = await Video.findById(videoId)
+  const video = await Video.findOne({
+    _id: videoId,
+    owner: req.user._id,
+  })
   if (!video) {
     throw new ApiError(404, 'Video not found.')
   }
@@ -223,7 +226,10 @@ const deleteVideo = asyncHandler(async (req, res) => {
     throw new ApiError(400, 'Invalid video id.')
   }
 
-  const video = await Video.findById(videoId)
+  const video = await Video.findOneAndDelete({
+    _id: videoId,
+    owner: req.user._id,
+  })
   if (!video) {
     throw new ApiError(404, 'Video not found.')
   }
@@ -244,8 +250,8 @@ const deleteVideo = asyncHandler(async (req, res) => {
   }
 
   res
-    .status(204)
-    .json(new ApiResponse(204, null, 'Video deleted successfully.'))
+    .status(200)
+    .json(new ApiResponse(200, null, 'Video deleted successfully.'))
 })
 
 const togglePublishStatus = asyncHandler(async (req, res) => {
@@ -254,7 +260,10 @@ const togglePublishStatus = asyncHandler(async (req, res) => {
     throw new ApiError(400, 'Invalid video id.')
   }
 
-  const video = await Video.findById(videoId)
+  const video = await Video.findOne({
+    _id: videoId,
+    owner: req.user._id,
+  })
   video.isPublished = !video.isPublished
   await video.save({ validateBeforeSave: false })
 

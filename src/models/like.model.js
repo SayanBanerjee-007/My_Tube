@@ -2,11 +2,6 @@ import { Schema, model } from 'mongoose'
 
 const likeSchema = new Schema(
   {
-    content: {
-      type: String,
-      required: true,
-      trim: true,
-    },
     likedBy: {
       type: Schema.Types.ObjectId,
       ref: 'User',
