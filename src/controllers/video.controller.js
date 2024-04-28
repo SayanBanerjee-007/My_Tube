@@ -52,6 +52,27 @@ const getAllVideos = asyncHandler(async (req, res) => {
       },
     },
     {
+      $lookup: {
+        from: 'users',
+        localField: 'owner',
+        foreignField: '_id',
+        as: 'owner',
+        pipeline: [
+          {
+            $project: {
+              _id: 1,
+              username: 1,
+              fullName: 1,
+              avatar: 1,
+            },
+          },
+        ],
+      },
+    },
+    {
+      $unwind: '$owner',
+    },
+    {
       $sort: {
         [sortBy]: sortType === 'desc' ? -1 : 1,
       },
@@ -139,32 +160,76 @@ const getVideoById = asyncHandler(async (req, res) => {
   }
 
   const currentUser = await getCurrentUser(req)
-  console.log('currentUser: ', currentUser)
+  let isPublished = true
 
-  let video
-
-  if (!currentUser) {
-    video = await Video.findOneAndUpdate(
-      { _id: videoId, isPublished: true },
-      { $inc: { views: 1 } },
-      { new: true }
-    )
-  } else {
-    video = await Video.findById(videoId)
+  if (currentUser) {
+    const video = await Video.findById(videoId)
     if (
       video.owner.toString() !== currentUser._id.toString() &&
       video.isPublished
     ) {
       video.views += 1
       await video.save({ validateBeforeSave: false })
+    } else if (video.owner.toString() === currentUser._id.toString()) {
+      isPublished = false
     }
   }
-  if (!video) {
+
+  const videos = await Video.aggregate([
+    {
+      $match: {
+        _id: new mongoose.Types.ObjectId(videoId),
+        isPublished: isPublished ? true : { $exists: true },
+      },
+    },
+    {
+      $lookup: {
+        from: 'users',
+        localField: 'owner',
+        foreignField: '_id',
+        as: 'owner',
+        pipeline: [
+          {
+            $project: {
+              _id: 1,
+              username: 1,
+              fullName: 1,
+              avatar: 1,
+            },
+          },
+        ],
+      },
+    },
+    {
+      $lookup: {
+        from: 'likes',
+        localField: '_id',
+        foreignField: 'video',
+        as: 'likes',
+      },
+    },
+    {
+      $addFields: {
+        likesCount: { $size: '$likes' },
+      },
+    },
+    {
+      $unwind: '$owner',
+    },
+    {
+      $project: {
+        likes: 0,
+      },
+    },
+  ])
+
+  if (!videos) {
     throw new ApiError(404, 'Video not found.')
   }
+
   res
     .status(200)
-    .json(new ApiResponse(200, video, 'Video fetched successfully.'))
+    .json(new ApiResponse(200, videos, 'Video fetched successfully.'))
 })
 
 const updateVideo = asyncHandler(async (req, res) => {
