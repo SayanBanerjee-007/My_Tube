@@ -1,9 +1,11 @@
 import mongoose from 'mongoose'
 import { Comment } from '../models/comment.model.js'
-import { asyncHandler } from '../utils/asyncHandler.js'
-import { ApiResponse } from '../utils/ApiResponse.js'
-import { ApiError } from '../utils/ApiError.js'
-import { paginateArray } from '../utils/paginateArray.js'
+import {
+  asyncHandler,
+  ApiError,
+  ApiResponse,
+  paginateArray,
+} from '../utils/index.js'
 
 const getVideoComments = asyncHandler(async (req, res) => {
   const { videoId } = req.params
@@ -90,6 +92,14 @@ const addComment = asyncHandler(async (req, res) => {
 
   if (!content?.trim()) {
     throw new ApiError(400, 'Content is required.')
+  }
+
+  const alreadyCommented = await Comment.findOne({
+    owner: userId,
+    video: videoId,
+  })
+  if (alreadyCommented) {
+    throw new ApiError(400, 'You have already commented on this video.')
   }
 
   const comment = await Comment.create({
