@@ -1,12 +1,12 @@
 import { Router } from 'express'
 import {
-  addVideoToPlaylist,
   createPlaylist,
-  deletePlaylist,
-  getPlaylistById,
-  getUserPlaylists,
-  removeVideoFromPlaylist,
+  getPlaylistVideosById,
   updatePlaylist,
+  deletePlaylist,
+  addVideoToPlaylist,
+  removeVideoFromPlaylist,
+  getUserPlaylists,
 } from '../controllers/playlist.controller.js'
 import { verifyJWT } from '../middlewares/auth.middleware.js'
 
@@ -18,7 +18,7 @@ playlistRouter.route('/').post(createPlaylist)
 
 playlistRouter
   .route('/:playlistId')
-  .get(getPlaylistById)
+  .get(getPlaylistVideosById)
   .patch(updatePlaylist)
   .delete(deletePlaylist)
 
