@@ -29,4 +29,4 @@ playlistRouter
 
 playlistRouter.route('/user/:userId').get(getUserPlaylists)
 
-export default playlistRouter
+export { playlistRouter }

@@ -6,6 +6,7 @@ import {
   ApiResponse,
   paginateArray,
 } from '../utils/index.js'
+import { Video } from '../models/video.model.js'
 
 const getVideoComments = asyncHandler(async (req, res) => {
   const { videoId } = req.params
@@ -84,7 +85,7 @@ const getVideoComments = asyncHandler(async (req, res) => {
 const addComment = asyncHandler(async (req, res) => {
   const { videoId } = req.params
   const { content } = req.body
-  const { userId } = req.user
+  const userId = req.user._id
 
   if (!mongoose.Types.ObjectId.isValid(videoId)) {
     throw new ApiError(400, 'Invalid video id.')
@@ -114,7 +115,7 @@ const addComment = asyncHandler(async (req, res) => {
 const updateComment = asyncHandler(async (req, res) => {
   const { commentId } = req.params
   const { content } = req.body
-  const { userId } = req.user
+  const userId = req.user._id
 
   if (!mongoose.Types.ObjectId.isValid(commentId)) {
     throw new ApiError(400, 'Invalid comment id.')
@@ -128,7 +129,7 @@ const updateComment = asyncHandler(async (req, res) => {
     throw new ApiError(404, 'Comment not found.')
   }
 
-  if (comment.owner.toString() !== userId) {
+  if (comment.owner.toString() !== userId.toString()) {
     throw new ApiError(403, 'You are not authorized to update this comment.')
   }
 
@@ -140,7 +141,7 @@ const updateComment = asyncHandler(async (req, res) => {
 
 const deleteComment = asyncHandler(async (req, res) => {
   const { commentId } = req.params
-  const { userId } = req.user
+  const userId = req.user._id
 
   if (!mongoose.Types.ObjectId.isValid(commentId)) {
     throw new ApiError(400, 'Invalid comment id.')
@@ -151,9 +152,13 @@ const deleteComment = asyncHandler(async (req, res) => {
     throw new ApiError(404, 'Comment not found.')
   }
 
+  const { _id: videoOwnerId } = await Video.findById(comment.video.toString(), {
+    _id: 1,
+  })
+
   if (
-    comment.owner.toString() !== userId &&
-    userId !== comment.video.owner.toString()
+    comment.owner.toString() !== userId.toString() &&
+    userId.toString() !== videoOwnerId.toString()
   ) {
     throw new ApiError(403, 'You are not authorized to delete this comment.')
   }
