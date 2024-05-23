@@ -1,4 +1,4 @@
-import mongoose, { isValidObjectId } from 'mongoose'
+import { isValidObjectId } from 'mongoose'
 import { Like } from '../models/like.model.js'
 import {
   asyncHandler,
@@ -6,11 +6,19 @@ import {
   ApiResponse,
   paginateArray,
 } from '../utils/index.js'
+import { Video } from '../models/video.model.js'
+import { Comment } from '../models/comment.model.js'
+import { Tweet } from '../models/tweet.model.js'
 
 const toggleVideoLike = asyncHandler(async (req, res) => {
   const { videoId } = req.params
   if (!isValidObjectId(videoId)) {
     throw new ApiError(400, 'Invalid video id.')
+  }
+
+  const video = await Video.findById(videoId)
+  if (!video || video.isPublished === false) {
+    throw new ApiError(404, 'Video not found.')
   }
 
   const likedBy = req.user._id
@@ -32,6 +40,11 @@ const toggleCommentLike = asyncHandler(async (req, res) => {
     throw new ApiError(400, 'Invalid comment id.')
   }
 
+  const comment = await Comment.findById(commentId)
+  if (!comment) {
+    throw new ApiError(404, 'Comment not found.')
+  }
+
   const likedBy = req.user._id
   const like = await Like.findOne({ likedBy, comment: commentId })
 
@@ -49,6 +62,11 @@ const toggleTweetLike = asyncHandler(async (req, res) => {
 
   if (!isValidObjectId(tweetId)) {
     throw new ApiError(400, 'Invalid tweet id.')
+  }
+
+  const tweet = await Tweet.findById(tweetId)
+  if (!tweet) {
+    throw new ApiError(404, 'Tweet not found.')
   }
 
   const likedBy = req.user._id
